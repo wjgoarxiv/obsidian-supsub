@@ -5,9 +5,11 @@ The **Obsidian SupSub Plugin** provides a convenient way to wrap selected text w
 
 ## Installation
 
-1. Download the latest release of the plugin from the [Releases](https://github.com/wjgoarxiv/obsidian-supsub/releases) page.
-2. Copy the `main.js` file and `manifest.json` file to your Obsidian vault's plugins directory. 
+1. Clone or download the repository files to your local machine.
+2. Copy the `main.js` and `manifest.json` files to your Obsidian vault's plugins directory.
 3. Enable the plugin in the Obsidian settings under "Community Plugins".
+
+Please note that this installation method requires manual copying of the plugin files to your Obsidian vault. Once the release files are available, you will be able to download them directly from the Releases page and follow the standard installation procedure. I am actively working on getting the Obsidian SupSub Plugin approved for inclusion in the Obsidian Community Plugins gallery. Once it is approved, you will be able to conveniently install the plugin directly from the Obsidian settings under "Community Plugins". I appreciate your patience and understanding during this process.
 
 ## Usage
 
