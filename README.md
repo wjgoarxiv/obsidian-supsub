@@ -1,11 +1,11 @@
 # obsidian-supsub
 
-The Obsidian SupSub Plugin provides a convenient way to wrap selected text with `<sup>` and `<sub>` tags, allowing you to easily format superscripts and subscripts in your notes.
+The **Obsidian SupSub Plugin** provides a convenient way to wrap selected text with `<sup>` and `<sub>` tags, allowing you to easily format __superscripts__ and __subscripts__ in your notes.
 
 ## Installation
 
 1. Download the latest release of the plugin from the [Releases](https://github.com/wjgoarxiv/obsidian-supsub/releases) page.
-2. Copy the `main.js` file and `manifest.json` file to your Obsidian vault's plugins directory.
+2. Copy the `main.js` file and `manifest.json` file to your Obsidian vault's plugins directory. 
 3. Enable the plugin in the Obsidian settings under "Community Plugins".
 
 ## Usage
