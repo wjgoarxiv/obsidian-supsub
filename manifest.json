@@ -1,11 +1,11 @@
 {
-	"id": "obsidian-sample-plugin",
-	"name": "Sample Plugin",
+	"id": "obsidian-supsub",
+	"name": "Obsidian SupSub",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
-	"description": "This is a sample plugin for Obsidian. This plugin demonstrates some of the capabilities of the Obsidian API.",
-	"author": "Obsidian",
-	"authorUrl": "https://obsidian.md",
-	"fundingUrl": "https://obsidian.md/pricing",
+	"description": "`obsidian-supsub` is a community plugin for Obsidian.md that adds functionality to wrap selected text with <sup></sup> (superscript) or <sub></sub> (subscript) tags.",
+	"author": "wjgoarxiv",
+	"authorUrl": "https://github.com/wjgoarxiv",
+	"fundingUrl": "https://www.buymeacoffee.com/woojingo/",
 	"isDesktopOnly": false
 }
