@@ -34,32 +34,16 @@ var SupSubPlugin = class extends import_obsidian.Plugin {
 		this.addCommand({
 			id: "wrap-sup",
 			name: "Wrap with <sup> tags",
-			callback: () => this.wrapSelection("sup"),
-			hotkeys: [
-				{
-					modifiers: ["Mod", "Alt"],
-					key: "=",
-				},
-			],
+			editorCallback: (editor, view) => this.wrapSelection("sup", editor),
 		});
 		this.addCommand({
 			id: "wrap-sub",
 			name: "Wrap with <sub> tags",
-			callback: () => this.wrapSelection("sub"),
-			hotkeys: [
-				{
-					modifiers: ["Mod", "Alt"],
-					key: "-",
-				},
-			],
+			editorCallback: (editor, view) => this.wrapSelection("sub", editor),
 		});
 	}
 
-	wrapSelection(tag) {
-		const activeLeaf = this.app.workspace.activeLeaf;
-		if (!activeLeaf) return;
-
-		const editor = activeLeaf.view.sourceMode.cmEditor;
+	wrapSelection(tag, editor) {
 		const selection = editor.getSelection();
 
 		// Check if the selected text is wrapped with the specified tag
