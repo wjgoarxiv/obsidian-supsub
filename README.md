@@ -1,4 +1,4 @@
-# obsidian-supsub
+# SupSub
 <img src = "testmovie.gif" width="65%">
 
 The **SupSub Plugin** provides a convenient way to wrap selected text with `<sup>` and `<sub>` tags, allowing you to easily format __superscripts__ and __subscripts__ in your notes.
