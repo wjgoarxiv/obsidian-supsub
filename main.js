@@ -33,12 +33,24 @@ var SupSubPlugin = class extends import_obsidian.Plugin {
     this.addCommand({
       id: "wrap-sup",
       name: "Wrap with <sup> tags",
-      editorCallback: (editor, view) => this.wrapSelection("sup", editor)
+      editorCallback: (editor, view) => this.wrapSelection("sup", editor),
+      hotkeys: [
+        {
+          modifiers: ["Mod", "Alt"],
+          key: "="
+        }
+      ]
     });
     this.addCommand({
       id: "wrap-sub",
       name: "Wrap with <sub> tags",
-      editorCallback: (editor, view) => this.wrapSelection("sub", editor)
+      editorCallback: (editor, view) => this.wrapSelection("sub", editor),
+      hotkeys: [
+        {
+          modifiers: ["Mod", "Alt"],
+          key: "-"
+        }
+      ]
     });
   }
   wrapSelection(tag, editor) {
@@ -53,4 +65,4 @@ var SupSubPlugin = class extends import_obsidian.Plugin {
       editor.replaceSelection(wrappedSelection);
     }
   }
-};
+}
