@@ -1,6 +1,7 @@
 # SupSub
 
 [![Obsidian Plugin](https://img.shields.io/badge/SupSub%20Plugin%20Link-%23483699.svg?style=for-the-badge&logo=obsidian&logoColor=white)](https://obsidian.md/plugins?id=supsub) </br>
+<img src = "testmovie.gif" width="55%"> </br>
 **SupSub** is an Obsidian plugin that allows you to easily wrap the selected text with `<sup>` and `<sub>` tags, enabling quick formatting of superscripts and subscripts in your notes.
 
 ## Usage
