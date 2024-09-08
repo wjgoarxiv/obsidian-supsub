@@ -29,15 +29,33 @@ export default class SupSubPlugin extends Plugin {
 	wrapSelection(tag: string, editor: Editor) {
 		const selection = editor.getSelection();
 
-		const regex = new RegExp(`<${tag}>(.*?)<\/${tag}>`);
-		const matches = regex.exec(selection);
+		if (selection) {
+			// Check if the selection is already wrapped with the tag
+			const regex = new RegExp(`<${tag}>(.*?)<\/${tag}>`);
+			const matches = regex.exec(selection);
 
-		if (matches) {
-			const debracketedSelection = matches[1];
-			editor.replaceSelection(debracketedSelection);
+			if (matches) {
+				// If the selection is already wrapped, unwrap it
+				const debracketedSelection = matches[1];
+				editor.replaceSelection(debracketedSelection);
+			} else {
+				// If not wrapped, wrap the selection with the tags
+				const wrappedSelection = `<${tag}>${selection}</${tag}>`;
+				editor.replaceSelection(wrappedSelection);
+			}
 		} else {
-			const wrappedSelection = `<${tag}>${selection}</${tag}>`;
-			editor.replaceSelection(wrappedSelection);
+			// No selection, insert the tags and position cursor in between
+			const cursor = editor.getCursor();
+			const wrappedTag = `<${tag}></${tag}>`;
+
+			editor.replaceRange(wrappedTag, cursor);
+
+			// Move the cursor to between the tags
+			const newCursorPos = {
+				line: cursor.line,
+				ch: cursor.ch + tag.length + 2, // position after opening tag
+			};
+			editor.setCursor(newCursorPos);
 		}
 	}
 }
