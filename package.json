@@ -14,7 +14,7 @@
 		"superscript",
 		"subscript"
 	],
-	"author": "Your Name",
+	"author": "wjgoarxiv",
 	"license": "MIT",
 	"devDependencies": {
 		"@types/node": "^16.11.6",
