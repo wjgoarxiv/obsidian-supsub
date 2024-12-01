@@ -1,7 +1,10 @@
 # SupSub
 
 [![Obsidian Plugin](https://img.shields.io/badge/SupSub%20Plugin%20Link-%23483699.svg?style=for-the-badge&logo=obsidian&logoColor=white)](https://obsidian.md/plugins?id=supsub) </br>
-<img src="./demomovie.mp4" width="55%"> </br>
+
+https://github.com/user-attachments/assets/c33bf693-23e0-4b67-92aa-ed189cfa75be
+
+</br>
 
 **SupSub** is an Obsidian plugin that allows you to easily format selected text with `<sup>` and `<sub>` tags, enabling quick superscript and subscript formatting in your notes.
 
@@ -44,7 +47,7 @@
 2. **Remove Superscript/Subscript**:
    - Select the text that is already formatted with `<sup>` or `<sub>` tags.
    - Click the **Normal (n)** button in the popup.
-   - The tags will be removed, reverting the text to normal formatting, and the popup will disappear.
+   - The tags will be removed, the text will be reverted to normal formatting, and the popup will disappear.
 
 ## Contributing
 
