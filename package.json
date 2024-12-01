@@ -1,15 +1,20 @@
 {
 	"name": "obsidian-supsub",
-	"version": "1.0.0",
-	"description": "`obsidian-supsub` is a community plugin for Obsidian.md that adds functionality to wrap selected text with <sup></sup> (superscript) or <sub></sub> (subscript) tags.",
+	"version": "1.0.3",
+	"description": "A plugin for Obsidian to easily add superscript and subscript formatting.",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
 		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
 		"version": "node version-bump.mjs && git add manifest.json versions.json"
 	},
-	"keywords": [],
-	"author": "wjgoarxiv",
+	"keywords": [
+		"obsidian",
+		"plugin",
+		"superscript",
+		"subscript"
+	],
+	"author": "Your Name",
 	"license": "MIT",
 	"devDependencies": {
 		"@types/node": "^16.11.6",
