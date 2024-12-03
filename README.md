@@ -57,8 +57,8 @@
 
 ## Contributing
 
-Contributions are welcome! If you encounter any issues or have suggestions for improvements, please open a new issue or submit a pull request in the [GitHub repository](https://github.com/yourusername/supsub).
+Contributions are welcome! If you encounter any issues or have suggestions for improvements, please open a new issue or submit a pull request in the [GitHub repository](https://github.com/wjgoarxiv/obsidian-supsub).
 
 ## License
 
-This plugin is licensed under the [MIT License](LICENSE).
+This plugin is licensed under the [MIT License](https://github.com/wjgoarxiv/obsidian-supsub/blob/master/LICENSE).
