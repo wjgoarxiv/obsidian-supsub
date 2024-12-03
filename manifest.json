@@ -1,7 +1,7 @@
 {
     "id": "supsub",
     "name": "SupSub",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "minAppVersion": "0.15.0",
     "description": "`Supsub` is a plugin designed for Obsidian.md that adds functionality to wrap selected text with <sup></sup> (superscript) or <sub></sub> (subscript) tags.",
     "author": "wjgoarxiv",

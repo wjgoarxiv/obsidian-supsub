@@ -1,16 +1,120 @@
-// main.ts
-import { Plugin, MarkdownView, Editor, Notice } from "obsidian";
+import { Plugin, MarkdownView, Editor, Notice, PluginSettingTab, Setting } from "obsidian";
+import { Decoration, DecorationSet, EditorView, ViewPlugin } from "@codemirror/view";
+
+interface SupSubSettings {
+    enablePopup: boolean;
+    hideTags: boolean;
+}
+
+const DEFAULT_SETTINGS: SupSubSettings = {
+    enablePopup: true,
+    hideTags: true
+};
+
+const tagDecoration = Decoration.mark({
+    attributes: {
+        style: "display: none;"
+    }
+});
+
+const supDecoration = Decoration.mark({
+    attributes: {
+        class: "cm-sup"
+    }
+});
+
+const subDecoration = Decoration.mark({
+    attributes: {
+        class: "cm-sub"
+    }
+});
+
+const supSubDecorationPlugin = ViewPlugin.define((view: EditorView) => {
+    let decorations = Decoration.none;
+    const doc = view.state.doc.toString();
+    const regex = /<(sup|sub)>(.*?)<\/\1>/g;
+    let match: RegExpExecArray | null;
+    while ((match = regex.exec(doc)) !== null) {
+        const tag = match[1];
+        const content = match[2];
+        const from = match.index;
+        const to = from + match[0].length;
+        const openTagStart = from;
+        const openTagEnd = from + `<${tag}>`.length;
+        const closeTagStart = to - `</${tag}>`.length;
+        const closeTagEnd = to;
+        decorations = decorations.update({
+            add: [tagDecoration.range(openTagStart, openTagEnd)]
+        });
+        decorations = decorations.update({
+            add: [tagDecoration.range(closeTagStart, closeTagEnd)]
+        });
+        if (tag === "sup") {
+            decorations = decorations.update({
+                add: [supDecoration.range(openTagEnd, closeTagStart)]
+            });
+        } else if (tag === "sub") {
+            decorations = decorations.update({
+                add: [subDecoration.range(openTagEnd, closeTagStart)]
+            });
+        }
+    }
+    return {
+        decorations
+    };
+}, {
+    decorations: (v) => v.decorations
+});
+
+class SupSubSettingTab extends PluginSettingTab {
+    plugin: SupSubPlugin;
+
+    constructor(app: App, plugin: SupSubPlugin) {
+        super(app, plugin);
+        this.plugin = plugin;
+    }
+
+    display(): void {
+        const { containerEl } = this;
+        containerEl.empty();
+        containerEl.createEl("h2", { text: "SupSub Settings" });
+        new Setting(containerEl)
+            .setName("Enable Popup Buttons")
+            .setDesc("Toggle the visibility of the SupSub popup buttons when text is selected.")
+            .addToggle(toggle => toggle.setValue(this.plugin.settings.enablePopup).onChange(async (value) => {
+                this.plugin.settings.enablePopup = value;
+                await this.plugin.saveSettings();
+                new Notice(`Popup Buttons ${value ? "Enabled" : "Disabled"}`);
+                if (!value) {
+                    this.plugin.hideSupSubButtons();
+                    this.plugin.selectionStart = null;
+                    this.plugin.selectionEnd = null;
+                }
+            }));
+        new Setting(containerEl)
+            .setName("Hide Sup/Sub Tags")
+            .setDesc("Instantly hide the <sup> and <sub> tags in Editor Mode after wrapping.")
+            .addToggle(toggle => toggle.setValue(this.plugin.settings.hideTags).onChange(async (value) => {
+                this.plugin.settings.hideTags = value;
+                await this.plugin.saveSettings();
+                new Notice(`Hide Tags ${value ? "Enabled" : "Disabled"}`);
+                this.plugin.refreshDecorations();
+            }));
+    }
+}
 
 export default class SupSubPlugin extends Plugin {
     styleEl: HTMLElement | null = null;
-    isWrapping: boolean = false; // Flag to prevent re-triggering
+    isWrapping: boolean = false;
     selectionStart: { line: number; ch: number } | null = null;
     selectionEnd: { line: number; ch: number } | null = null;
+    settings: SupSubSettings;
+    supSubDecorations: any = null;
 
-    onload() {
-        console.log('SupSub Plugin loaded');
-
-        // Register commands
+    async onload() {
+        console.log("SupSub Plugin loaded");
+        await this.loadSettings();
+        this.addSettingTab(new SupSubSettingTab(this.app, this));
         this.addCommand({
             id: "wrap-sup",
             name: "Wrap with <sup> tags",
@@ -33,20 +137,18 @@ export default class SupSubPlugin extends Plugin {
                 },
             ],
         });
-
-        // Inject CSS
         const style = `
             .supsub-popup {
                 position: absolute;
                 background: var(--background-primary);
                 border: 1px solid var(--border);
                 padding: 5px;
-                border-radius: 8px; /* Enhanced rounding */
+                border-radius: 8px;
                 box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-                z-index: 10000; /* Increased z-index */
+                z-index: 10000;
                 display: flex;
                 gap: 5px;
-                transition: opacity 0.1s ease; /* Shorter transition */
+                transition: opacity 0.1s ease;
                 opacity: 0;
                 pointer-events: none;
             }
@@ -58,13 +160,21 @@ export default class SupSubPlugin extends Plugin {
                 background: var(--background-modifier-hover);
                 border: none;
                 padding: 5px 10px;
-                border-radius: 4px; /* Enhanced rounding */
+                border-radius: 4px;
                 cursor: pointer;
                 font-size: 12px;
                 transition: background 0.2s ease;
             }
             .supsub-popup button:hover {
                 background: var(--background-modifier-hover-active);
+            }
+            .cm-sup {
+                vertical-align: super;
+                font-size: smaller;
+            }
+            .cm-sub {
+                vertical-align: sub;
+                font-size: smaller;
             }
         `;
         this.styleEl = document.createElement("style");
@@ -75,25 +185,25 @@ export default class SupSubPlugin extends Plugin {
                 this.styleEl.remove();
             }
         });
-
-        // Register selection change event
-        this.registerEvent(this.app.workspace.on('editor-selection-change', (editor: Editor) => {
-            if (this.isWrapping) return; // Prevent if wrapping is in progress
+        this.registerEvent(this.app.workspace.on("editor-selection-change", (editor: Editor) => {
+            if (this.isWrapping)
+                return;
             const selection = editor.getSelection();
-            if (selection) {
+            if (selection && this.settings.enablePopup) {
                 this.showSupSubButtons(editor);
             } else {
                 this.hideSupSubButtons();
             }
         }));
-
-        // Hide popup on external click
         this.registerDomEvent(document, "click", (evt) => {
             const target = evt.target as HTMLElement;
             if (!target.closest(".supsub-popup")) {
                 this.hideSupSubButtons();
             }
         });
+        if (this.settings.hideTags) {
+            this.supSubDecorations = this.registerEditorExtension(supSubDecorationPlugin);
+        }
     }
 
     onunload() {
@@ -102,66 +212,78 @@ export default class SupSubPlugin extends Plugin {
         if (this.styleEl) {
             this.styleEl.remove();
         }
+        if (this.supSubDecorations) {
+            this.supSubDecorations = null;
+        }
+    }
+
+    async loadSettings() {
+        this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    }
+
+    async saveSettings() {
+        await this.saveData(this.settings);
+    }
+
+    refreshDecorations() {
+        if (this.settings.hideTags) {
+            if (!this.supSubDecorations) {
+                this.supSubDecorations = this.registerEditorExtension(supSubDecorationPlugin);
+            }
+        } else {
+            if (this.supSubDecorations) {
+                this.supSubDecorations = null;
+            }
+        }
     }
 
     showSupSubButtons(editor: Editor) {
-        this.hideSupSubButtons(); // Remove all existing buttons
-
+        if (!this.settings.enablePopup)
+            return;
+        this.hideSupSubButtons();
         const selection = editor.getSelection();
-        if (!selection) return;
-
-        const cursorStart = editor.getCursor('from');
-        const cursorEnd = editor.getCursor('to');
+        if (!selection)
+            return;
+        const cursorStart = editor.getCursor("from");
+        const cursorEnd = editor.getCursor("to");
         this.selectionStart = { ...cursorStart };
         this.selectionEnd = { ...cursorEnd };
-
         const currentTag = this.getCurrentTag(selection);
-
         const buttonContainer = document.createElement("div");
         buttonContainer.className = "supsub-popup";
-
         if (currentTag === "sup" || currentTag === "sub") {
-            // Only show 'Normal (n)' button to remove the tag
             const normalButton = document.createElement("button");
-            normalButton.innerText = "Normal (n)"; // You can consider "Clear (n)" or "Plain (n)"
+            normalButton.innerText = "Normal (n)";
             normalButton.setAttribute("aria-label", "Remove superscript/subscript");
             normalButton.addEventListener("mousedown", (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                this.wrapSelection(currentTag, editor); // This will remove the tag
+                this.wrapSelection(currentTag, editor);
             });
             buttonContainer.appendChild(normalButton);
         } else {
-            // Show both 'Sup (ⁿ)' and 'Sub (ₙ)' buttons
             const supButton = document.createElement("button");
-            supButton.innerText = "Sup (ⁿ)"; // Updated label with superscript n
+            supButton.innerText = "Sup (\u207F)";
             supButton.setAttribute("aria-label", "Wrap selected text with superscript");
-            supButton.addEventListener("mousedown", (e) => { // Changed to mousedown
+            supButton.addEventListener("mousedown", (e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 this.wrapSelection("sup", editor);
             });
-
             const subButton = document.createElement("button");
-            subButton.innerText = "Sub (ₙ)"; // Updated label with subscript n
+            subButton.innerText = "Sub (\u2089)";
             subButton.setAttribute("aria-label", "Wrap selected text with subscript");
-            subButton.addEventListener("mousedown", (e) => { // Changed to mousedown
+            subButton.addEventListener("mousedown", (e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 this.wrapSelection("sub", editor);
             });
-
             buttonContainer.appendChild(supButton);
             buttonContainer.appendChild(subButton);
         }
-
-        // Append to document.body to avoid CSS constraints
         buttonContainer.style.position = "absolute";
         document.body.appendChild(buttonContainer);
-
         this.positionPopup(buttonContainer, editor);
-
-        // Make the popup visible by adding the 'visible' class after positioning
         requestAnimationFrame(() => {
             buttonContainer.classList.add("visible");
         });
@@ -170,12 +292,10 @@ export default class SupSubPlugin extends Plugin {
     hideSupSubButtons() {
         const buttonContainers = document.querySelectorAll(".supsub-popup");
         buttonContainers.forEach((buttonContainer) => {
-            // Add transition for fading out
             buttonContainer.classList.remove("visible");
-            // Remove the popup after a short delay to allow transition
             setTimeout(() => {
                 buttonContainer.remove();
-            }, 100); // Match the CSS transition duration (0.1s)
+            }, 100);
         });
     }
 
@@ -184,69 +304,84 @@ export default class SupSubPlugin extends Plugin {
         if (selection && selection.rangeCount > 0) {
             const range = selection.getRangeAt(0);
             const rect = range.getBoundingClientRect();
-
-            const top = rect.bottom + window.scrollY + 5; // 5px offset
+            const top = rect.bottom + window.scrollY + 5;
             const left = rect.left + (rect.width / 2) - (popup.offsetWidth / 2);
-
-            // Prevent the popup from going outside the viewport's boundaries
-            const maxLeft = window.innerWidth - popup.offsetWidth - 10; // 10px padding
+            const maxLeft = window.innerWidth - popup.offsetWidth - 10;
             const calculatedLeft = Math.max(10, Math.min(left, maxLeft));
-
             popup.style.top = `${top}px`;
             popup.style.left = `${calculatedLeft}px`;
-
             console.log(`Popup positioned at top: ${top}px, left: ${calculatedLeft}px`);
         }
     }
 
     wrapSelection(tag: string, editor: Editor) {
-        this.isWrapping = true; // Indicate that wrapping is in progress
-
-        // Restore the original selection
-        if (this.selectionStart && this.selectionEnd) {
-            editor.setSelection(this.selectionStart, this.selectionEnd);
-        }
-
-        // Focus the editor to ensure it's ready
-        editor.focus();
-
-        // Perform wrapping after a short delay to ensure selection is restored
-        setTimeout(() => {
-            const selection = editor.getSelection();
-            console.log(`Wrapping selection: "${selection}" with tag: <${tag}>`);
-
-            if (selection) {
-                const regex = new RegExp(`<${tag}>(.*?)<\/${tag}>`, "s"); // 's' flag for multiline
-                const matches = regex.exec(selection);
-
-                if (matches) {
-                    const debracketedSelection = matches[1];
-                    editor.replaceSelection(debracketedSelection);
-                    new Notice(`${tag} tags removed`);
+        this.isWrapping = true;
+        try {
+            if (this.selectionStart && this.selectionEnd) {
+                const docLines = editor.lineCount();
+                const isValidStart = this.selectionStart.line >= 0 && this.selectionStart.line < docLines &&
+                    this.selectionStart.ch >= 0 && this.selectionStart.ch <= editor.getLine(this.selectionStart.line).length;
+                const isValidEnd = this.selectionEnd.line >= 0 && this.selectionEnd.line < docLines &&
+                    this.selectionEnd.ch >= 0 && this.selectionEnd.ch <= editor.getLine(this.selectionEnd.line).length;
+                if (isValidStart && isValidEnd) {
+                    editor.setSelection(this.selectionStart, this.selectionEnd);
                 } else {
-                    const wrappedSelection = `<${tag}>${selection}</${tag}>`;
-                    editor.replaceSelection(wrappedSelection);
-                    new Notice(`${tag} tags added`);
+                    console.warn("Invalid selection points. Clearing selectionStart and selectionEnd.");
+                    this.selectionStart = null;
+                    this.selectionEnd = null;
                 }
-
-                // Hide the popup after wrapping
-                this.hideSupSubButtons();
-            } else {
-                // No selection, do not hide the popup
             }
+            editor.focus();
+            setTimeout(() => {
+                const selection = editor.getSelection();
+                console.log(`Wrapping selection: "${selection}" with tag: <${tag}>`);
+                if (selection) {
+                    const regex = new RegExp(`<${tag}>(.*?)</${tag}>`, "s");
+                    const matches = regex.exec(selection);
+                    if (matches) {
+                        const debracketedSelection = matches[1];
+                        editor.replaceSelection(debracketedSelection);
+                        new Notice(`${tag} tags removed`);
+                    } else {
+                        const wrappedSelection = `<${tag}>${selection}</${tag}>`;
+                        editor.replaceSelection(wrappedSelection);
+                        new Notice(`${tag} tags added`);
+                    }
+                    this.hideSupSubButtons();
+                    if (this.settings.hideTags) {
+                        const cursor = editor.getCursor();
+                        const lineContent = editor.getLine(cursor.line);
+                        const optimizedLine = this.optimizeTags(lineContent, tag);
+                        editor.setLine(cursor.line, optimizedLine);
+                    }
+                    const newCursor = editor.getCursor("to");
+                    editor.setSelection(newCursor, newCursor);
+                    editor.scrollIntoView({
+                        from: editor.getCursor('from'),
+                        to: editor.getCursor('to'),
+                        center: true
+                    });
+                }
+            }, 50);
+        } catch (error) {
+            console.error("Error in wrapSelection:", error);
+            new Notice("An error occurred while wrapping selection.");
+        } finally {
+            this.isWrapping = false;
+        }
+    }
 
-            // Clear the selection by setting both start and end to the new cursor position
-            const currentCursor = editor.getCursor();
-            editor.setSelection(currentCursor, currentCursor);
-
-            this.isWrapping = false; // Reset the wrapping flag
-        }, 50); // Increased delay to 50ms for better reliability
+    optimizeTags(line: string, tag: string): string {
+        const openTag = `<${tag}>`;
+        const closeTag = `</${tag}>`;
+        let optimizedLine = line.replace(new RegExp(`(${closeTag})(${openTag})`, "g"), "");
+        optimizedLine = optimizedLine.replace(new RegExp(`\\${openTag}\\s*\\${closeTag}`, "g"), "");
+        return optimizedLine;
     }
 
     private getCurrentTag(selection: string): string | null {
         const supRegex = /^<sup>([\s\S]+)<\/sup>$/i;
         const subRegex = /^<sub>([\s\S]+)<\/sub>$/i;
-
         if (supRegex.test(selection)) {
             return "sup";
         } else if (subRegex.test(selection)) {
