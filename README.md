@@ -6,6 +6,13 @@
 
 **SupSub** is an Obsidian plugin that allows you to easily format selected text with `<sup>` and `<sub>` tags, enabling quick superscript and subscript formatting in your notes.
 
+## What's New in Version 1.0.5 (@2025-05-19)
+
+- **Bug Fixes**:
+  - **Fixed Text Shifting Issue**: Resolved an issue where superscript and subscript text would shift positions when editing text in rows above.
+  - **Fixed Disappearing Text**: Fixed a problem where letters would disappear when typing near superscript or subscript content.
+  - **Improved Decoration Handling**: Enhanced the way hidden tags are managed to ensure consistent editing experience.
+
 ## What's New in Version 1.0.4 (@2024-12-03)
 
 - **Bug Fixes**:

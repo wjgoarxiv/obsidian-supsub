@@ -1,5 +1,6 @@
 import { Plugin, MarkdownView, Editor, Notice, PluginSettingTab, Setting } from "obsidian";
-import { Decoration, DecorationSet, EditorView, ViewPlugin } from "@codemirror/view";
+import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate } from "@codemirror/view";
+import { RangeSetBuilder } from "@codemirror/state";
 
 interface SupSubSettings {
     enablePopup: boolean;
@@ -29,11 +30,26 @@ const subDecoration = Decoration.mark({
     }
 });
 
+// Improved decoration plugin with better update handling
 const supSubDecorationPlugin = ViewPlugin.define((view: EditorView) => {
-    let decorations = Decoration.none;
+    return {
+        decorations: computeDecorations(view),
+        update(update: ViewUpdate) {
+            if (update.docChanged || update.viewportChanged) {
+                this.decorations = computeDecorations(view);
+            }
+        }
+    };
+}, {
+    decorations: (v) => v.decorations
+});
+
+function computeDecorations(view: EditorView) {
+    const builder = new RangeSetBuilder<Decoration>();
     const doc = view.state.doc.toString();
     const regex = /<(sup|sub)>(.*?)<\/\1>/g;
     let match: RegExpExecArray | null;
+    
     while ((match = regex.exec(doc)) !== null) {
         const tag = match[1];
         const content = match[2];
@@ -43,29 +59,22 @@ const supSubDecorationPlugin = ViewPlugin.define((view: EditorView) => {
         const openTagEnd = from + `<${tag}>`.length;
         const closeTagStart = to - `</${tag}>`.length;
         const closeTagEnd = to;
-        decorations = decorations.update({
-            add: [tagDecoration.range(openTagStart, openTagEnd)]
-        });
-        decorations = decorations.update({
-            add: [tagDecoration.range(closeTagStart, closeTagEnd)]
-        });
+        
+        // Add decorations for tags and content
+        builder.add(openTagStart, openTagEnd, tagDecoration);
+        builder.add(closeTagStart, closeTagEnd, tagDecoration);
+        
         if (tag === "sup") {
-            decorations = decorations.update({
-                add: [supDecoration.range(openTagEnd, closeTagStart)]
-            });
+            builder.add(openTagEnd, closeTagStart, supDecoration);
         } else if (tag === "sub") {
-            decorations = decorations.update({
-                add: [subDecoration.range(openTagEnd, closeTagStart)]
-            });
+            builder.add(openTagEnd, closeTagStart, subDecoration);
         }
     }
-    return {
-        decorations
-    };
-}, {
-    decorations: (v) => v.decorations
-});
+    
+    return builder.finish();
+}
 
+// Rest of the class remains unchanged
 class SupSubSettingTab extends PluginSettingTab {
     plugin: SupSubPlugin;
 
@@ -171,10 +180,14 @@ export default class SupSubPlugin extends Plugin {
             .cm-sup {
                 vertical-align: super;
                 font-size: smaller;
+                position: relative; /* Improved positioning */
+                display: inline-block; /* Better layout handling */
             }
             .cm-sub {
                 vertical-align: sub;
                 font-size: smaller;
+                position: relative; /* Improved positioning */
+                display: inline-block; /* Better layout handling */
             }
         `;
         this.styleEl = document.createElement("style");
@@ -271,7 +284,7 @@ export default class SupSubPlugin extends Plugin {
                 this.wrapSelection("sup", editor);
             });
             const subButton = document.createElement("button");
-            subButton.innerText = "Sub (\u2089)";
+            subButton.innerText = "Sub (\u2099)"; // Ensure we're using correct Unicode for subscript n
             subButton.setAttribute("aria-label", "Wrap selected text with subscript");
             subButton.addEventListener("mousedown", (e) => {
                 e.preventDefault();
