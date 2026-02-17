@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-supsub",
-	"version": "1.0.5",
+	"version": "1.1.0",
 	"description": "A plugin for Obsidian to easily add superscript and subscript formatting.",
 	"main": "main.js",
 	"scripts": {

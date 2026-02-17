@@ -1,22 +1,22 @@
-import { Plugin, MarkdownView, Editor, Notice, PluginSettingTab, Setting } from "obsidian";
+import { App, Plugin, MarkdownView, Editor, Notice, PluginSettingTab, Setting } from "obsidian";
 import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate } from "@codemirror/view";
 import { RangeSetBuilder } from "@codemirror/state";
 
 interface SupSubSettings {
     enablePopup: boolean;
     hideTags: boolean;
+    popupModifierKey: "Mod" | "Ctrl" | "Shift" | "Alt" | "none";
 }
 
 const DEFAULT_SETTINGS: SupSubSettings = {
     enablePopup: true,
-    hideTags: true
+    hideTags: true,
+    popupModifierKey: "Mod"
 };
 
-const tagDecoration = Decoration.mark({
-    attributes: {
-        style: "display: none;"
-    }
-});
+let pluginSettings: SupSubSettings = DEFAULT_SETTINGS;
+
+const tagDecoration = Decoration.replace({});
 
 const supDecoration = Decoration.mark({
     attributes: {
@@ -30,51 +30,49 @@ const subDecoration = Decoration.mark({
     }
 });
 
-// Improved decoration plugin with better update handling
 const supSubDecorationPlugin = ViewPlugin.define((view: EditorView) => {
     return {
         decorations: computeDecorations(view),
         update(update: ViewUpdate) {
             if (update.docChanged || update.viewportChanged) {
-                this.decorations = computeDecorations(view);
+                this.decorations = computeDecorations(update.view);
             }
         }
     };
 }, {
-    decorations: (v) => v.decorations
+    decorations: (v: any) => v.decorations
 });
 
-function computeDecorations(view: EditorView) {
+function computeDecorations(view: EditorView): DecorationSet {
+    if (!pluginSettings.hideTags) {
+        return Decoration.none;
+    }
     const builder = new RangeSetBuilder<Decoration>();
-    const doc = view.state.doc.toString();
+    const doc = view.state.doc;
     const regex = /<(sup|sub)>(.*?)<\/\1>/g;
-    let match: RegExpExecArray | null;
-    
-    while ((match = regex.exec(doc)) !== null) {
-        const tag = match[1];
-        const content = match[2];
-        const from = match.index;
-        const to = from + match[0].length;
-        const openTagStart = from;
-        const openTagEnd = from + `<${tag}>`.length;
-        const closeTagStart = to - `</${tag}>`.length;
-        const closeTagEnd = to;
-        
-        // Add decorations for tags and content
-        builder.add(openTagStart, openTagEnd, tagDecoration);
-        builder.add(closeTagStart, closeTagEnd, tagDecoration);
-        
-        if (tag === "sup") {
-            builder.add(openTagEnd, closeTagStart, supDecoration);
-        } else if (tag === "sub") {
-            builder.add(openTagEnd, closeTagStart, subDecoration);
+
+    for (const { from, to } of view.visibleRanges) {
+        const text = doc.sliceString(from, to);
+        let match: RegExpExecArray | null;
+        while ((match = regex.exec(text)) !== null) {
+            const tag = match[1];
+            const absFrom = from + match.index;
+            const absTo = absFrom + match[0].length;
+            const openTagEnd = absFrom + `<${tag}>`.length;
+            const closeTagStart = absTo - `</${tag}>`.length;
+
+            builder.add(absFrom, openTagEnd, tagDecoration);
+            if (tag === "sup") {
+                builder.add(openTagEnd, closeTagStart, supDecoration);
+            } else {
+                builder.add(openTagEnd, closeTagStart, subDecoration);
+            }
+            builder.add(closeTagStart, absTo, tagDecoration);
         }
     }
-    
     return builder.finish();
 }
 
-// Rest of the class remains unchanged
 class SupSubSettingTab extends PluginSettingTab {
     plugin: SupSubPlugin;
 
@@ -109,6 +107,21 @@ class SupSubSettingTab extends PluginSettingTab {
                 new Notice(`Hide Tags ${value ? "Enabled" : "Disabled"}`);
                 this.plugin.refreshDecorations();
             }));
+        new Setting(containerEl)
+            .setName("Popup Modifier Key")
+            .setDesc("Require holding a modifier key to show the popup when text is selected. Set to 'None' for the popup to always appear on selection.")
+            .addDropdown(dropdown => dropdown
+                .addOption("Mod", "Cmd / Ctrl (recommended)")
+                .addOption("Ctrl", "Ctrl")
+                .addOption("Shift", "Shift")
+                .addOption("Alt", "Alt")
+                .addOption("none", "None (always show)")
+                .setValue(this.plugin.settings.popupModifierKey)
+                .onChange(async (value: string) => {
+                    this.plugin.settings.popupModifierKey = value as SupSubSettings["popupModifierKey"];
+                    await this.plugin.saveSettings();
+                    new Notice(`Popup modifier key set to ${value === "none" ? "None" : value}`);
+                }));
     }
 }
 
@@ -118,33 +131,45 @@ export default class SupSubPlugin extends Plugin {
     selectionStart: { line: number; ch: number } | null = null;
     selectionEnd: { line: number; ch: number } | null = null;
     settings: SupSubSettings;
-    supSubDecorations: any = null;
+
+    // Modifier key tracking (Issue #9)
+    modifierKeyPressed: boolean = false;
+
+    // Toggle mode state (Issue #10)
+    toggleMode: "sup" | "sub" | null = null;
+    toggleStatusBarEl: HTMLElement | null = null;
+    toggleStartPos: number = 0;
+    toggleStartLine: number = 0;
 
     async onload() {
-        console.log("SupSub Plugin loaded");
         await this.loadSettings();
+        pluginSettings = this.settings;
         this.addSettingTab(new SupSubSettingTab(this.app, this));
         this.addCommand({
             id: "wrap-sup",
             name: "Wrap with <sup> tags",
-            editorCallback: (editor, view) => this.wrapSelection("sup", editor),
-            hotkeys: [
-                {
-                    modifiers: ["Mod", "Alt"],
-                    key: "=",
-                },
-            ],
+            editorCallback: (editor: Editor) => {
+                const selection = editor.getSelection();
+                if (selection) {
+                    this.wrapSelection("sup", editor);
+                } else {
+                    this.toggleTypingMode("sup", editor);
+                }
+            },
+            hotkeys: [{ modifiers: ["Mod", "Alt"], key: "=" }],
         });
         this.addCommand({
             id: "wrap-sub",
             name: "Wrap with <sub> tags",
-            editorCallback: (editor, view) => this.wrapSelection("sub", editor),
-            hotkeys: [
-                {
-                    modifiers: ["Mod", "Alt"],
-                    key: "-",
-                },
-            ],
+            editorCallback: (editor: Editor) => {
+                const selection = editor.getSelection();
+                if (selection) {
+                    this.wrapSelection("sub", editor);
+                } else {
+                    this.toggleTypingMode("sub", editor);
+                }
+            },
+            hotkeys: [{ modifiers: ["Mod", "Alt"], key: "-" }],
         });
         const style = `
             .supsub-popup {
@@ -180,14 +205,10 @@ export default class SupSubPlugin extends Plugin {
             .cm-sup {
                 vertical-align: super;
                 font-size: smaller;
-                position: relative; /* Improved positioning */
-                display: inline-block; /* Better layout handling */
             }
             .cm-sub {
                 vertical-align: sub;
                 font-size: smaller;
-                position: relative; /* Improved positioning */
-                display: inline-block; /* Better layout handling */
             }
         `;
         this.styleEl = document.createElement("style");
@@ -198,11 +219,55 @@ export default class SupSubPlugin extends Plugin {
                 this.styleEl.remove();
             }
         });
-        this.registerEvent(this.app.workspace.on("editor-selection-change", (editor: Editor) => {
-            if (this.isWrapping)
-                return;
+
+        // Modifier key tracking for popup (Issue #9)
+        this.registerDomEvent(document, "keydown", (evt: KeyboardEvent) => {
+            if (this.isModifierMatch(evt)) {
+                this.modifierKeyPressed = true;
+                // Show popup if there's already a selection
+                const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+                if (view && this.settings.enablePopup) {
+                    const editor = view.editor;
+                    const selection = editor.getSelection();
+                    if (selection) {
+                        this.showSupSubButtons(editor);
+                    }
+                }
+            }
+            // Escape exits toggle mode
+            if (evt.key === "Escape" && this.toggleMode) {
+                const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+                if (view) {
+                    this.exitToggleMode(view.editor);
+                }
+            }
+        });
+
+        this.registerDomEvent(document, "keyup", (evt: KeyboardEvent) => {
+            if (this.isModifierMatch(evt)) {
+                this.modifierKeyPressed = false;
+                this.hideSupSubButtons();
+            }
+        });
+
+        this.registerDomEvent(document, "blur", () => {
+            this.modifierKeyPressed = false;
+        });
+
+        this.registerEvent((this.app.workspace as any).on("editor-selection-change", (editor: Editor) => {
+            if (this.isWrapping) return;
+
+            // Toggle mode: exit if cursor moves to a different line
+            if (this.toggleMode) {
+                const cursor = editor.getCursor();
+                if (cursor.line !== this.toggleStartLine) {
+                    this.exitToggleMode(editor);
+                }
+            }
+
             const selection = editor.getSelection();
-            if (selection && this.settings.enablePopup) {
+            if (selection && this.settings.enablePopup &&
+                (this.settings.popupModifierKey === "none" || this.modifierKeyPressed)) {
                 this.showSupSubButtons(editor);
             } else {
                 this.hideSupSubButtons();
@@ -214,20 +279,19 @@ export default class SupSubPlugin extends Plugin {
                 this.hideSupSubButtons();
             }
         });
-        if (this.settings.hideTags) {
-            this.supSubDecorations = this.registerEditorExtension(supSubDecorationPlugin);
-        }
+        this.registerEditorExtension(supSubDecorationPlugin);
     }
 
     onunload() {
-        console.log("SupSub Plugin unloaded");
         this.hideSupSubButtons();
         if (this.styleEl) {
             this.styleEl.remove();
         }
-        if (this.supSubDecorations) {
-            this.supSubDecorations = null;
+        if (this.toggleStatusBarEl) {
+            this.toggleStatusBarEl.remove();
+            this.toggleStatusBarEl = null;
         }
+        this.toggleMode = null;
     }
 
     async loadSettings() {
@@ -236,18 +300,12 @@ export default class SupSubPlugin extends Plugin {
 
     async saveSettings() {
         await this.saveData(this.settings);
+        pluginSettings = this.settings;
     }
 
     refreshDecorations() {
-        if (this.settings.hideTags) {
-            if (!this.supSubDecorations) {
-                this.supSubDecorations = this.registerEditorExtension(supSubDecorationPlugin);
-            }
-        } else {
-            if (this.supSubDecorations) {
-                this.supSubDecorations = null;
-            }
-        }
+        pluginSettings = this.settings;
+        this.app.workspace.updateOptions();
     }
 
     showSupSubButtons(editor: Editor) {
@@ -284,7 +342,7 @@ export default class SupSubPlugin extends Plugin {
                 this.wrapSelection("sup", editor);
             });
             const subButton = document.createElement("button");
-            subButton.innerText = "Sub (\u2099)"; // Ensure we're using correct Unicode for subscript n
+            subButton.innerText = "Sub (\u2099)";
             subButton.setAttribute("aria-label", "Wrap selected text with subscript");
             subButton.addEventListener("mousedown", (e) => {
                 e.preventDefault();
@@ -323,7 +381,6 @@ export default class SupSubPlugin extends Plugin {
             const calculatedLeft = Math.max(10, Math.min(left, maxLeft));
             popup.style.top = `${top}px`;
             popup.style.left = `${calculatedLeft}px`;
-            console.log(`Popup positioned at top: ${top}px, left: ${calculatedLeft}px`);
         }
     }
 
@@ -339,7 +396,6 @@ export default class SupSubPlugin extends Plugin {
                 if (isValidStart && isValidEnd) {
                     editor.setSelection(this.selectionStart, this.selectionEnd);
                 } else {
-                    console.warn("Invalid selection points. Clearing selectionStart and selectionEnd.");
                     this.selectionStart = null;
                     this.selectionEnd = null;
                 }
@@ -347,7 +403,6 @@ export default class SupSubPlugin extends Plugin {
             editor.focus();
             setTimeout(() => {
                 const selection = editor.getSelection();
-                console.log(`Wrapping selection: "${selection}" with tag: <${tag}>`);
                 if (selection) {
                     const regex = new RegExp(`<${tag}>(.*?)</${tag}>`, "s");
                     const matches = regex.exec(selection);
@@ -371,8 +426,7 @@ export default class SupSubPlugin extends Plugin {
                     editor.setSelection(newCursor, newCursor);
                     editor.scrollIntoView({
                         from: editor.getCursor('from'),
-                        to: editor.getCursor('to'),
-                        center: true
+                        to: editor.getCursor('to')
                     });
                 }
             }, 50);
@@ -388,7 +442,7 @@ export default class SupSubPlugin extends Plugin {
         const openTag = `<${tag}>`;
         const closeTag = `</${tag}>`;
         let optimizedLine = line.replace(new RegExp(`(${closeTag})(${openTag})`, "g"), "");
-        optimizedLine = optimizedLine.replace(new RegExp(`\\${openTag}\\s*\\${closeTag}`, "g"), "");
+        optimizedLine = optimizedLine.replace(new RegExp(`${openTag}\\s*${closeTag}`, "g"), "");
         return optimizedLine;
     }
 
@@ -402,5 +456,80 @@ export default class SupSubPlugin extends Plugin {
         } else {
             return null;
         }
+    }
+
+    private isModifierMatch(evt: KeyboardEvent): boolean {
+        const key = this.settings.popupModifierKey;
+        if (key === "none") return false;
+        if (key === "Mod") {
+            return evt.key === "Meta" || evt.key === "Control";
+        }
+        if (key === "Ctrl") return evt.key === "Control";
+        if (key === "Shift") return evt.key === "Shift";
+        if (key === "Alt") return evt.key === "Alt";
+        return false;
+    }
+
+    private toggleTypingMode(tag: "sup" | "sub", editor: Editor) {
+        // If same mode active, toggle off
+        if (this.toggleMode === tag) {
+            this.exitToggleMode(editor);
+            return;
+        }
+        // If different mode active, exit it first
+        if (this.toggleMode) {
+            this.exitToggleMode(editor);
+        }
+
+        this.toggleMode = tag;
+        const cursor = editor.getCursor();
+        this.toggleStartLine = cursor.line;
+
+        // Insert opening tag
+        const openTag = `<${tag}>`;
+        editor.replaceRange(openTag, cursor);
+
+        // Move cursor past the opening tag
+        const newCh = cursor.ch + openTag.length;
+        editor.setCursor({ line: cursor.line, ch: newCh });
+        this.toggleStartPos = newCh;
+
+        // Show status bar indicator
+        this.toggleStatusBarEl = this.addStatusBarItem();
+        this.toggleStatusBarEl.setText(tag.toUpperCase());
+        this.toggleStatusBarEl.style.cssText = "color: var(--text-accent); font-weight: bold; font-size: 11px; padding: 0 8px; background: var(--background-modifier-hover); border-radius: 4px;";
+
+        new Notice(`${tag === "sup" ? "Superscript" : "Subscript"} mode activated — press Escape to exit`);
+    }
+
+    private exitToggleMode(editor: Editor) {
+        if (!this.toggleMode) return;
+
+        const tag = this.toggleMode;
+        const closeTag = `</${tag}>`;
+
+        // Insert closing tag at current cursor position
+        const cursor = editor.getCursor();
+        editor.replaceRange(closeTag, cursor);
+
+        // Move cursor past the closing tag
+        editor.setCursor({ line: cursor.line, ch: cursor.ch + closeTag.length });
+
+        // Clean up empty tag pairs on the line
+        const line = cursor.line;
+        const lineContent = editor.getLine(line);
+        const optimized = this.optimizeTags(lineContent, tag);
+        if (optimized !== lineContent) {
+            editor.setLine(line, optimized);
+        }
+
+        // Remove status bar indicator
+        if (this.toggleStatusBarEl) {
+            this.toggleStatusBarEl.remove();
+            this.toggleStatusBarEl = null;
+        }
+
+        new Notice(`${tag === "sup" ? "Superscript" : "Subscript"} mode deactivated`);
+        this.toggleMode = null;
     }
 }
