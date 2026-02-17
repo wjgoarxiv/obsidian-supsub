@@ -332,7 +332,32 @@ export default class SupSubPlugin extends Plugin {
         const cursorEnd = editor.getCursor("to");
         this.selectionStart = { ...cursorStart };
         this.selectionEnd = { ...cursorEnd };
-        const currentTag = this.getCurrentTag(selection);
+
+        // Check if selection is inside sup/sub tags by examining surrounding text
+        let effectiveSelection = selection;
+        if (cursorStart.line === cursorEnd.line) {
+            const line = editor.getLine(cursorStart.line);
+            for (const tag of ["sup", "sub"] as const) {
+                const openTag = `<${tag}>`;
+                const closeTag = `</${tag}>`;
+                const before = line.substring(0, cursorStart.ch);
+                const after = line.substring(cursorEnd.ch);
+                const openIdx = before.lastIndexOf(openTag);
+                const closeIdx = after.indexOf(closeTag);
+                if (openIdx !== -1 && closeIdx !== -1) {
+                    // Verify no nested close tag between open tag and selection
+                    const between = before.substring(openIdx + openTag.length);
+                    if (!between.includes(closeTag)) {
+                        this.selectionStart = { line: cursorStart.line, ch: openIdx };
+                        this.selectionEnd = { line: cursorEnd.line, ch: cursorEnd.ch + closeIdx + closeTag.length };
+                        effectiveSelection = line.substring(openIdx, cursorEnd.ch + closeIdx + closeTag.length);
+                        break;
+                    }
+                }
+            }
+        }
+
+        const currentTag = this.getCurrentTag(effectiveSelection);
         const buttonContainer = document.createElement("div");
         buttonContainer.className = "supsub-popup";
         if (currentTag === "sup" || currentTag === "sub") {
