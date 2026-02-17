@@ -6,6 +6,18 @@
 
 **SupSub** is an Obsidian plugin that allows you to easily format selected text with `<sup>` and `<sub>` tags, enabling quick superscript and subscript formatting in your notes.
 
+## What's New in Version 1.1.0 (@2026-02-17)
+
+- **Bug Fixes**:
+  - **Fixed Tag Hiding Rendering**: Switched from `Decoration.mark()` with `display: none` to `Decoration.replace()` for hiding `<sup>`/`<sub>` tags. This eliminates cursor position mismatches that caused letters to disappear when typing near formatted text.
+  - **Fixed Text Shifting**: Removed `display: inline-block` and `position: relative` CSS properties from superscript/subscript elements that were causing text to shift positions during editing.
+  - **Fixed Hide Tags Toggle**: The "Hide Tags" setting now properly toggles on and off without requiring a restart.
+  - **Performance Optimization**: Decoration computation now only processes visible ranges instead of the entire document.
+
+- **New Features**:
+  - **Modifier Key for Popup**: The popup buttons now require holding a modifier key (Cmd/Ctrl by default) while selecting text. This prevents accidental popup appearances during normal text navigation. Configurable in Settings with options: Cmd/Ctrl, Ctrl, Shift, Alt, or None (legacy behavior).
+  - **Toggle Typing Mode**: Activate superscript or subscript mode without selecting text first. Place your cursor and press the hotkey — a status bar indicator appears and everything you type is automatically formatted. Press Escape to exit. Supports toggling between modes and auto-exits on line change.
+
 ## What's New in Version 1.0.5 (@2025-05-19)
 
 - **Bug Fixes**:
@@ -33,22 +45,29 @@
 
 ## Usage
 
-- **Superscript**: 
+- **Superscript**:
   - **Hotkey**: `Option + Command + '='` on macOS or `Ctrl + Alt + '='` on Windows.
-  - **Action**: Wraps the selected text with `<sup>` tags. If no text is selected, the cursor will be placed between the `<sup></sup>` tags.
+  - **With selection**: Wraps the selected text with `<sup>` tags.
+  - **Without selection**: Activates superscript typing mode — a status bar indicator ("SUP") appears and everything you type is formatted as superscript. Press **Escape** to exit.
   - **Button**: **Sup (ⁿ)**
-  
-- **Subscript**: 
+
+- **Subscript**:
   - **Hotkey**: `Option + Command + '-'` on macOS or `Ctrl + Alt + '-'` on Windows.
-  - **Action**: Wraps the selected text with `<sub>` tags. If no text is selected, the cursor will be placed between the `<sub></sub>` tags.
+  - **With selection**: Wraps the selected text with `<sub>` tags.
+  - **Without selection**: Activates subscript typing mode — a status bar indicator ("SUB") appears and everything you type is formatted as subscript. Press **Escape** to exit.
   - **Button**: **Sub (ₙ)**
-  
-- **Remove Formatting**: 
+
+- **Remove Formatting**:
   - **Action**: Removes existing `<sup>` or `<sub>` tags from the selected text.
   - **Button**: **Normal (n)**
-  
-- **Toggling**: 
+
+- **Toggling**:
   - If the selected text is already wrapped in `<sup>` or `<sub>`, using the respective button or hotkey will remove the tags.
+
+- **Popup Modifier Key**:
+  - By default, the popup buttons only appear when holding **Cmd** (macOS) or **Ctrl** (Windows/Linux) while selecting text.
+  - Change the modifier key in **Settings > SupSub > Popup Modifier Key**.
+  - Set to **None** to restore the previous always-show behavior.
 
 ## Example Workflow
 
