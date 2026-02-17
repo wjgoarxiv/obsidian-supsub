@@ -51,7 +51,7 @@ var supSubDecorationPlugin = import_view.ViewPlugin.define((view) => {
   return {
     decorations: computeDecorations(view),
     update(update) {
-      if (update.docChanged || update.viewportChanged) {
+      if (update.docChanged || update.viewportChanged || update.selectionSet) {
         this.decorations = computeDecorations(update.view);
       }
     }
@@ -65,8 +65,10 @@ function computeDecorations(view) {
   }
   const builder = new import_state.RangeSetBuilder();
   const doc = view.state.doc;
+  const cursorLine = doc.lineAt(view.state.selection.main.head).number;
   const regex = /<(sup|sub)>(.*?)<\/\1>/g;
   for (const { from, to } of view.visibleRanges) {
+    regex.lastIndex = 0;
     const text = doc.sliceString(from, to);
     let match;
     while ((match = regex.exec(text)) !== null) {
@@ -75,13 +77,22 @@ function computeDecorations(view) {
       const absTo = absFrom + match[0].length;
       const openTagEnd = absFrom + `<${tag}>`.length;
       const closeTagStart = absTo - `</${tag}>`.length;
-      builder.add(absFrom, openTagEnd, tagDecoration);
-      if (tag === "sup") {
-        builder.add(openTagEnd, closeTagStart, supDecoration);
+      const matchLine = doc.lineAt(absFrom).number;
+      if (matchLine === cursorLine) {
+        if (tag === "sup") {
+          builder.add(openTagEnd, closeTagStart, supDecoration);
+        } else {
+          builder.add(openTagEnd, closeTagStart, subDecoration);
+        }
       } else {
-        builder.add(openTagEnd, closeTagStart, subDecoration);
+        builder.add(absFrom, openTagEnd, tagDecoration);
+        if (tag === "sup") {
+          builder.add(openTagEnd, closeTagStart, supDecoration);
+        } else {
+          builder.add(openTagEnd, closeTagStart, subDecoration);
+        }
+        builder.add(closeTagStart, absTo, tagDecoration);
       }
-      builder.add(closeTagStart, absTo, tagDecoration);
     }
   }
   return builder.finish();

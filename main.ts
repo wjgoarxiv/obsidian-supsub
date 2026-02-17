@@ -34,7 +34,7 @@ const supSubDecorationPlugin = ViewPlugin.define((view: EditorView) => {
     return {
         decorations: computeDecorations(view),
         update(update: ViewUpdate) {
-            if (update.docChanged || update.viewportChanged) {
+            if (update.docChanged || update.viewportChanged || update.selectionSet) {
                 this.decorations = computeDecorations(update.view);
             }
         }
@@ -49,9 +49,11 @@ function computeDecorations(view: EditorView): DecorationSet {
     }
     const builder = new RangeSetBuilder<Decoration>();
     const doc = view.state.doc;
+    const cursorLine = doc.lineAt(view.state.selection.main.head).number;
     const regex = /<(sup|sub)>(.*?)<\/\1>/g;
 
     for (const { from, to } of view.visibleRanges) {
+        regex.lastIndex = 0;
         const text = doc.sliceString(from, to);
         let match: RegExpExecArray | null;
         while ((match = regex.exec(text)) !== null) {
@@ -60,14 +62,25 @@ function computeDecorations(view: EditorView): DecorationSet {
             const absTo = absFrom + match[0].length;
             const openTagEnd = absFrom + `<${tag}>`.length;
             const closeTagStart = absTo - `</${tag}>`.length;
+            const matchLine = doc.lineAt(absFrom).number;
 
-            builder.add(absFrom, openTagEnd, tagDecoration);
-            if (tag === "sup") {
-                builder.add(openTagEnd, closeTagStart, supDecoration);
+            if (matchLine === cursorLine) {
+                // Cursor's line: show tags, but still style the content
+                if (tag === "sup") {
+                    builder.add(openTagEnd, closeTagStart, supDecoration);
+                } else {
+                    builder.add(openTagEnd, closeTagStart, subDecoration);
+                }
             } else {
-                builder.add(openTagEnd, closeTagStart, subDecoration);
+                // Other lines: hide tags with replace decorations
+                builder.add(absFrom, openTagEnd, tagDecoration);
+                if (tag === "sup") {
+                    builder.add(openTagEnd, closeTagStart, supDecoration);
+                } else {
+                    builder.add(openTagEnd, closeTagStart, subDecoration);
+                }
+                builder.add(closeTagStart, absTo, tagDecoration);
             }
-            builder.add(closeTagStart, absTo, tagDecoration);
         }
     }
     return builder.finish();
