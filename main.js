@@ -29,7 +29,6 @@ __export(main_exports, {
 module.exports = __toCommonJS(main_exports);
 var import_obsidian = require("obsidian");
 var import_view = require("@codemirror/view");
-var import_state = require("@codemirror/state");
 var DEFAULT_SETTINGS = {
   enablePopup: true,
   hideTags: true,
@@ -63,10 +62,10 @@ function computeDecorations(view) {
   if (!pluginSettings.hideTags) {
     return import_view.Decoration.none;
   }
-  const builder = new import_state.RangeSetBuilder();
   const doc = view.state.doc;
   const cursorLine = doc.lineAt(view.state.selection.main.head).number;
   const regex = /<(sup|sub)>(.*?)<\/\1>/g;
+  const ranges = [];
   for (const { from, to } of view.visibleRanges) {
     regex.lastIndex = 0;
     const text = doc.sliceString(from, to);
@@ -78,24 +77,19 @@ function computeDecorations(view) {
       const openTagEnd = absFrom + `<${tag}>`.length;
       const closeTagStart = absTo - `</${tag}>`.length;
       const matchLine = doc.lineAt(absFrom).number;
+      if (openTagEnd > closeTagStart)
+        continue;
+      const contentDec = tag === "sup" ? supDecoration : subDecoration;
       if (matchLine === cursorLine) {
-        if (tag === "sup") {
-          builder.add(openTagEnd, closeTagStart, supDecoration);
-        } else {
-          builder.add(openTagEnd, closeTagStart, subDecoration);
-        }
+        ranges.push(contentDec.range(openTagEnd, closeTagStart));
       } else {
-        builder.add(absFrom, openTagEnd, tagDecoration);
-        if (tag === "sup") {
-          builder.add(openTagEnd, closeTagStart, supDecoration);
-        } else {
-          builder.add(openTagEnd, closeTagStart, subDecoration);
-        }
-        builder.add(closeTagStart, absTo, tagDecoration);
+        ranges.push(tagDecoration.range(absFrom, openTagEnd));
+        ranges.push(contentDec.range(openTagEnd, closeTagStart));
+        ranges.push(tagDecoration.range(closeTagStart, absTo));
       }
     }
   }
-  return builder.finish();
+  return import_view.Decoration.set(ranges, true);
 }
 var SupSubSettingTab = class extends import_obsidian.PluginSettingTab {
   constructor(app, plugin) {
@@ -419,6 +413,7 @@ var SupSubPlugin = class extends import_obsidian.Plugin {
           if (selection) {
             const regex = new RegExp(`<${tag}>(.*?)</${tag}>`, "s");
             const matches = regex.exec(selection);
+            let didWrap = false;
             if (matches) {
               const debracketedSelection = matches[1];
               editor.replaceSelection(debracketedSelection);
@@ -427,6 +422,7 @@ var SupSubPlugin = class extends import_obsidian.Plugin {
               const wrappedSelection = `<${tag}>${selection}</${tag}>`;
               editor.replaceSelection(wrappedSelection);
               new import_obsidian.Notice(`${tag} tags added`);
+              didWrap = true;
             }
             this.hideSupSubButtons();
             if (this.settings.hideTags) {
@@ -437,8 +433,14 @@ var SupSubPlugin = class extends import_obsidian.Plugin {
                 editor.setLine(cursor.line, optimizedLine);
               }
             }
-            const newCursor = editor.getCursor("to");
-            editor.setSelection(newCursor, newCursor);
+            const endPos = editor.getCursor("to");
+            if (didWrap) {
+              const closingTagLen = `</${tag}>`.length;
+              const newCursor = { line: endPos.line, ch: endPos.ch - closingTagLen };
+              editor.setSelection(newCursor, newCursor);
+            } else {
+              editor.setSelection(endPos, endPos);
+            }
             this.selectionStart = null;
             this.selectionEnd = null;
             editor.scrollIntoView({

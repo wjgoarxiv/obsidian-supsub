@@ -1,6 +1,6 @@
 import { App, Plugin, MarkdownView, Editor, Notice, PluginSettingTab, Setting } from "obsidian";
 import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate } from "@codemirror/view";
-import { RangeSetBuilder } from "@codemirror/state";
+import { type Range } from "@codemirror/state";
 
 interface SupSubSettings {
     enablePopup: boolean;
@@ -47,10 +47,10 @@ function computeDecorations(view: EditorView): DecorationSet {
     if (!pluginSettings.hideTags) {
         return Decoration.none;
     }
-    const builder = new RangeSetBuilder<Decoration>();
     const doc = view.state.doc;
     const cursorLine = doc.lineAt(view.state.selection.main.head).number;
     const regex = /<(sup|sub)>(.*?)<\/\1>/g;
+    const ranges: Range<Decoration>[] = [];
 
     for (const { from, to } of view.visibleRanges) {
         regex.lastIndex = 0;
@@ -64,26 +64,24 @@ function computeDecorations(view: EditorView): DecorationSet {
             const closeTagStart = absTo - `</${tag}>`.length;
             const matchLine = doc.lineAt(absFrom).number;
 
+            // Skip empty or invalid tag pairs
+            if (openTagEnd > closeTagStart) continue;
+
+            const contentDec = tag === "sup" ? supDecoration : subDecoration;
+
             if (matchLine === cursorLine) {
                 // Cursor's line: show tags, but still style the content
-                if (tag === "sup") {
-                    builder.add(openTagEnd, closeTagStart, supDecoration);
-                } else {
-                    builder.add(openTagEnd, closeTagStart, subDecoration);
-                }
+                ranges.push(contentDec.range(openTagEnd, closeTagStart));
             } else {
                 // Other lines: hide tags with replace decorations
-                builder.add(absFrom, openTagEnd, tagDecoration);
-                if (tag === "sup") {
-                    builder.add(openTagEnd, closeTagStart, supDecoration);
-                } else {
-                    builder.add(openTagEnd, closeTagStart, subDecoration);
-                }
-                builder.add(closeTagStart, absTo, tagDecoration);
+                ranges.push(tagDecoration.range(absFrom, openTagEnd));
+                ranges.push(contentDec.range(openTagEnd, closeTagStart));
+                ranges.push(tagDecoration.range(closeTagStart, absTo));
             }
         }
     }
-    return builder.finish();
+    // Decoration.set with sort=true handles ordering automatically
+    return Decoration.set(ranges, true);
 }
 
 class SupSubSettingTab extends PluginSettingTab {
@@ -458,6 +456,7 @@ export default class SupSubPlugin extends Plugin {
                     if (selection) {
                         const regex = new RegExp(`<${tag}>(.*?)</${tag}>`, "s");
                         const matches = regex.exec(selection);
+                        let didWrap = false;
                         if (matches) {
                             const debracketedSelection = matches[1];
                             editor.replaceSelection(debracketedSelection);
@@ -466,6 +465,7 @@ export default class SupSubPlugin extends Plugin {
                             const wrappedSelection = `<${tag}>${selection}</${tag}>`;
                             editor.replaceSelection(wrappedSelection);
                             new Notice(`${tag} tags added`);
+                            didWrap = true;
                         }
                         this.hideSupSubButtons();
                         if (this.settings.hideTags) {
@@ -476,8 +476,15 @@ export default class SupSubPlugin extends Plugin {
                                 editor.setLine(cursor.line, optimizedLine);
                             }
                         }
-                        const newCursor = editor.getCursor("to");
-                        editor.setSelection(newCursor, newCursor);
+                        const endPos = editor.getCursor("to");
+                        if (didWrap) {
+                            // Place cursor right after content, before closing tag
+                            const closingTagLen = `</${tag}>`.length;
+                            const newCursor = { line: endPos.line, ch: endPos.ch - closingTagLen };
+                            editor.setSelection(newCursor, newCursor);
+                        } else {
+                            editor.setSelection(endPos, endPos);
+                        }
                         this.selectionStart = null;
                         this.selectionEnd = null;
                         editor.scrollIntoView({
