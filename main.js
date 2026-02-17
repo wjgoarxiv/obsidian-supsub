@@ -310,22 +310,30 @@ var SupSubPlugin = class extends import_obsidian.Plugin {
     let effectiveSelection = selection;
     if (cursorStart.line === cursorEnd.line) {
       const line = editor.getLine(cursorStart.line);
-      for (const tag of ["sup", "sub"]) {
-        const openTag = `<${tag}>`;
-        const closeTag = `</${tag}>`;
-        const before = line.substring(0, cursorStart.ch);
-        const after = line.substring(cursorEnd.ch);
-        const openIdx = before.lastIndexOf(openTag);
-        const closeIdx = after.indexOf(closeTag);
-        if (openIdx !== -1 && closeIdx !== -1) {
-          const between = before.substring(openIdx + openTag.length);
-          if (!between.includes(closeTag)) {
-            this.selectionStart = { line: cursorStart.line, ch: openIdx };
-            this.selectionEnd = { line: cursorEnd.line, ch: cursorEnd.ch + closeIdx + closeTag.length };
-            effectiveSelection = line.substring(openIdx, cursorEnd.ch + closeIdx + closeTag.length);
-            break;
+      const tagRegex = /<(sup|sub)>([\s\S]*?)<\/\1>/g;
+      let match;
+      let bestMatch = null;
+      let bestDistance = Infinity;
+      while ((match = tagRegex.exec(line)) !== null) {
+        const matchStart = match.index;
+        const matchEnd = match.index + match[0].length;
+        if (cursorStart.ch >= matchStart && cursorEnd.ch <= matchEnd) {
+          bestMatch = { start: matchStart, end: matchEnd, full: match[0] };
+          break;
+        }
+        if (match[2] === selection) {
+          const contentStart = matchStart + `<${match[1]}>`.length;
+          const dist = Math.abs(cursorStart.ch - contentStart);
+          if (dist < bestDistance) {
+            bestDistance = dist;
+            bestMatch = { start: matchStart, end: matchEnd, full: match[0] };
           }
         }
+      }
+      if (bestMatch) {
+        this.selectionStart = { line: cursorStart.line, ch: bestMatch.start };
+        this.selectionEnd = { line: cursorEnd.line, ch: bestMatch.end };
+        effectiveSelection = bestMatch.full;
       }
     }
     const currentTag = this.getCurrentTag(effectiveSelection);

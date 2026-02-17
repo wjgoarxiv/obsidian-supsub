@@ -333,27 +333,40 @@ export default class SupSubPlugin extends Plugin {
         this.selectionStart = { ...cursorStart };
         this.selectionEnd = { ...cursorEnd };
 
-        // Check if selection is inside sup/sub tags by examining surrounding text
+        // Check if selection is inside sup/sub tags by examining the raw document line
         let effectiveSelection = selection;
         if (cursorStart.line === cursorEnd.line) {
             const line = editor.getLine(cursorStart.line);
-            for (const tag of ["sup", "sub"] as const) {
-                const openTag = `<${tag}>`;
-                const closeTag = `</${tag}>`;
-                const before = line.substring(0, cursorStart.ch);
-                const after = line.substring(cursorEnd.ch);
-                const openIdx = before.lastIndexOf(openTag);
-                const closeIdx = after.indexOf(closeTag);
-                if (openIdx !== -1 && closeIdx !== -1) {
-                    // Verify no nested close tag between open tag and selection
-                    const between = before.substring(openIdx + openTag.length);
-                    if (!between.includes(closeTag)) {
-                        this.selectionStart = { line: cursorStart.line, ch: openIdx };
-                        this.selectionEnd = { line: cursorEnd.line, ch: cursorEnd.ch + closeIdx + closeTag.length };
-                        effectiveSelection = line.substring(openIdx, cursorEnd.ch + closeIdx + closeTag.length);
-                        break;
+            const tagRegex = /<(sup|sub)>([\s\S]*?)<\/\1>/g;
+            let match;
+            let bestMatch: { start: number; end: number; full: string } | null = null;
+            let bestDistance = Infinity;
+
+            while ((match = tagRegex.exec(line)) !== null) {
+                const matchStart = match.index;
+                const matchEnd = match.index + match[0].length;
+
+                // Primary: cursor positions fall within the tag range
+                if (cursorStart.ch >= matchStart && cursorEnd.ch <= matchEnd) {
+                    bestMatch = { start: matchStart, end: matchEnd, full: match[0] };
+                    break;
+                }
+
+                // Fallback: selection text matches the tag content (handles decoration-offset cursors)
+                if (match[2] === selection) {
+                    const contentStart = matchStart + `<${match[1]}>`.length;
+                    const dist = Math.abs(cursorStart.ch - contentStart);
+                    if (dist < bestDistance) {
+                        bestDistance = dist;
+                        bestMatch = { start: matchStart, end: matchEnd, full: match[0] };
                     }
                 }
+            }
+
+            if (bestMatch) {
+                this.selectionStart = { line: cursorStart.line, ch: bestMatch.start };
+                this.selectionEnd = { line: cursorEnd.line, ch: bestMatch.end };
+                effectiveSelection = bestMatch.full;
             }
         }
 
