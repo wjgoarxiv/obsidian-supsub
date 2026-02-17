@@ -402,38 +402,45 @@ export default class SupSubPlugin extends Plugin {
             }
             editor.focus();
             setTimeout(() => {
-                const selection = editor.getSelection();
-                if (selection) {
-                    const regex = new RegExp(`<${tag}>(.*?)</${tag}>`, "s");
-                    const matches = regex.exec(selection);
-                    if (matches) {
-                        const debracketedSelection = matches[1];
-                        editor.replaceSelection(debracketedSelection);
-                        new Notice(`${tag} tags removed`);
-                    } else {
-                        const wrappedSelection = `<${tag}>${selection}</${tag}>`;
-                        editor.replaceSelection(wrappedSelection);
-                        new Notice(`${tag} tags added`);
+                try {
+                    const selection = editor.getSelection();
+                    if (selection) {
+                        const regex = new RegExp(`<${tag}>(.*?)</${tag}>`, "s");
+                        const matches = regex.exec(selection);
+                        if (matches) {
+                            const debracketedSelection = matches[1];
+                            editor.replaceSelection(debracketedSelection);
+                            new Notice(`${tag} tags removed`);
+                        } else {
+                            const wrappedSelection = `<${tag}>${selection}</${tag}>`;
+                            editor.replaceSelection(wrappedSelection);
+                            new Notice(`${tag} tags added`);
+                        }
+                        this.hideSupSubButtons();
+                        if (this.settings.hideTags) {
+                            const cursor = editor.getCursor();
+                            const lineContent = editor.getLine(cursor.line);
+                            const optimizedLine = this.optimizeTags(lineContent, tag);
+                            if (optimizedLine !== lineContent) {
+                                editor.setLine(cursor.line, optimizedLine);
+                            }
+                        }
+                        const newCursor = editor.getCursor("to");
+                        editor.setSelection(newCursor, newCursor);
+                        this.selectionStart = null;
+                        this.selectionEnd = null;
+                        editor.scrollIntoView({
+                            from: editor.getCursor('from'),
+                            to: editor.getCursor('to')
+                        });
                     }
-                    this.hideSupSubButtons();
-                    if (this.settings.hideTags) {
-                        const cursor = editor.getCursor();
-                        const lineContent = editor.getLine(cursor.line);
-                        const optimizedLine = this.optimizeTags(lineContent, tag);
-                        editor.setLine(cursor.line, optimizedLine);
-                    }
-                    const newCursor = editor.getCursor("to");
-                    editor.setSelection(newCursor, newCursor);
-                    editor.scrollIntoView({
-                        from: editor.getCursor('from'),
-                        to: editor.getCursor('to')
-                    });
+                } finally {
+                    this.isWrapping = false;
                 }
             }, 50);
         } catch (error) {
             console.error("Error in wrapSelection:", error);
             new Notice("An error occurred while wrapping selection.");
-        } finally {
             this.isWrapping = false;
         }
     }
