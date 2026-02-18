@@ -344,8 +344,9 @@ export default class SupSubPlugin extends Plugin {
                 const matchStart = match.index;
                 const matchEnd = match.index + match[0].length;
 
-                // Primary: cursor positions fall within the tag range
-                if (cursorStart.ch >= matchStart && cursorEnd.ch <= matchEnd) {
+                // Check if selection overlaps with this tag range at all
+                // (handles partial selections from hidden decorations)
+                if (cursorStart.ch < matchEnd && cursorEnd.ch > matchStart) {
                     bestMatch = { start: matchStart, end: matchEnd, full: match[0] };
                     break;
                 }
@@ -454,43 +455,83 @@ export default class SupSubPlugin extends Plugin {
                 try {
                     const selection = editor.getSelection();
                     if (selection) {
-                        const regex = new RegExp(`<${tag}>(.*?)</${tag}>`, "s");
-                        const matches = regex.exec(selection);
-                        let didWrap = false;
-                        if (matches) {
-                            const debracketedSelection = matches[1];
-                            editor.replaceSelection(debracketedSelection);
-                            new Notice(`${tag} tags removed`);
-                        } else {
+                        const cursorFrom = editor.getCursor("from");
+                        const cursorTo = editor.getCursor("to");
+
+                        // Position-aware: scan raw line for any tag overlapping the cursor/selection.
+                        // This handles imprecise selections caused by hidden-tag decorations.
+                        let handled = false;
+                        if (cursorFrom.line === cursorTo.line) {
+                            const line = editor.getLine(cursorFrom.line);
+                            const tagRegex = /<(sup|sub)>([\s\S]*?)<\/\1>/g;
+                            let tagMatch;
+
+                            while ((tagMatch = tagRegex.exec(line)) !== null) {
+                                const mStart = tagMatch.index;
+                                const mEnd = tagMatch.index + tagMatch[0].length;
+
+                                // Overlap test: cursor/selection touches this tag?
+                                if (cursorFrom.ch < mEnd && cursorTo.ch > mStart) {
+                                    // Select the full tag range, then unwrap
+                                    editor.setSelection(
+                                        { line: cursorFrom.line, ch: mStart },
+                                        { line: cursorFrom.line, ch: mEnd }
+                                    );
+                                    editor.replaceSelection(tagMatch[2]);
+                                    new Notice(`${tagMatch[1]} tags removed`);
+                                    this.hideSupSubButtons();
+                                    if (this.settings.hideTags) {
+                                        const cursor = editor.getCursor();
+                                        const lineContent = editor.getLine(cursor.line);
+                                        const optimizedLine = this.optimizeTags(lineContent, tagMatch[1]);
+                                        if (optimizedLine !== lineContent) {
+                                            editor.setLine(cursor.line, optimizedLine);
+                                        }
+                                    }
+                                    this.selectionStart = null;
+                                    this.selectionEnd = null;
+                                    const endPos = editor.getCursor("to");
+                                    requestAnimationFrame(() => {
+                                        editor.setCursor(endPos);
+                                    });
+                                    handled = true;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (!handled) {
+                            // No overlapping tag found → wrap with new tags
+                            // Guard: prevent wrapping text that already contains tag fragments
+                            if (/<\/?(sup|sub)>/i.test(selection)) {
+                                new Notice("Selection already contains tags");
+                                this.hideSupSubButtons();
+                                this.selectionStart = null;
+                                this.selectionEnd = null;
+                                return;
+                            }
                             const wrappedSelection = `<${tag}>${selection}</${tag}>`;
                             editor.replaceSelection(wrappedSelection);
                             new Notice(`${tag} tags added`);
-                            didWrap = true;
-                        }
-                        this.hideSupSubButtons();
-                        if (this.settings.hideTags) {
-                            const cursor = editor.getCursor();
-                            const lineContent = editor.getLine(cursor.line);
-                            const optimizedLine = this.optimizeTags(lineContent, tag);
-                            if (optimizedLine !== lineContent) {
-                                editor.setLine(cursor.line, optimizedLine);
+                            this.hideSupSubButtons();
+                            if (this.settings.hideTags) {
+                                const cursor = editor.getCursor();
+                                const lineContent = editor.getLine(cursor.line);
+                                const optimizedLine = this.optimizeTags(lineContent, tag);
+                                if (optimizedLine !== lineContent) {
+                                    editor.setLine(cursor.line, optimizedLine);
+                                }
                             }
-                        }
-                        const endPos = editor.getCursor("to");
-                        if (didWrap) {
-                            // Place cursor right after content, before closing tag
+                            this.selectionStart = null;
+                            this.selectionEnd = null;
+                            const endPos = editor.getCursor("to");
                             const closingTagLen = `</${tag}>`.length;
-                            const newCursor = { line: endPos.line, ch: endPos.ch - closingTagLen };
-                            editor.setSelection(newCursor, newCursor);
-                        } else {
-                            editor.setSelection(endPos, endPos);
+                            const targetLine = endPos.line;
+                            const targetCh = endPos.ch - closingTagLen;
+                            requestAnimationFrame(() => {
+                                editor.setCursor({ line: targetLine, ch: targetCh });
+                            });
                         }
-                        this.selectionStart = null;
-                        this.selectionEnd = null;
-                        editor.scrollIntoView({
-                            from: editor.getCursor('from'),
-                            to: editor.getCursor('to')
-                        });
                     }
                 } finally {
                     this.isWrapping = false;

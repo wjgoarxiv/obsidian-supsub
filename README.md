@@ -6,6 +6,18 @@
 
 **SupSub** is an Obsidian plugin that allows you to easily format selected text with `<sup>` and `<sub>` tags, enabling quick superscript and subscript formatting in your notes.
 
+## What's New in Version 1.1.1 (@2026-02-18)
+
+- **Bug Fixes**:
+  - **Fixed Decoration Ordering Crash**: Replaced `RangeSetBuilder` with `Decoration.set(ranges, true)` to eliminate "Ranges must be added sorted" console errors on edge cases.
+  - **Fixed Cursor Placement After Wrapping**: After wrapping text with sup/sub, the cursor now correctly lands inside the tags (before the closing tag) instead of at the end of the line. Uses `requestAnimationFrame` to ensure stable positioning after decoration reflow.
+  - **Fixed Normal Button Not Appearing**: When tags are hidden by decorations, selecting superscripted/subscripted content now reliably shows the "Normal (n)" button. Uses overlap detection instead of strict containment, so imprecise selections still work.
+  - **Fixed Double-Wrapping**: Selecting text that partially overlaps existing tags no longer produces malformed output like `<sup><sup>2</sup></sup>`. The plugin detects overlapping tags and unwraps instead of double-wrapping.
+
+- **Improvements**:
+  - **Position-Aware Unwrapping**: The unwrap logic now scans the raw line for tags at the cursor position rather than relying on exact selection text. This handles all cases where hidden decorations cause visual-to-raw coordinate mismatches.
+  - **Cursor Line Tag Visibility**: Tags are now shown on the line where the cursor is (matching Obsidian's native behavior for bold/italic), allowing direct editing when needed.
+
 ## What's New in Version 1.1.0 (@2026-02-17)
 
 - **Bug Fixes**:
@@ -60,9 +72,11 @@
 - **Remove Formatting**:
   - **Action**: Removes existing `<sup>` or `<sub>` tags from the selected text.
   - **Button**: **Normal (n)**
+  - **With hidden tags**: When the "Hide Tags" setting is enabled, simply select the visible superscripted/subscripted text and hold the modifier key — the "Normal (n)" button appears automatically, even if your selection doesn't perfectly match the raw tag boundaries.
 
 - **Toggling**:
   - If the selected text is already wrapped in `<sup>` or `<sub>`, using the respective button or hotkey will remove the tags.
+  - The plugin uses position-aware detection: as long as your cursor or selection overlaps any part of a tag, it will correctly unwrap instead of double-wrapping.
 
 - **Popup Modifier Key**:
   - By default, the popup buttons only appear when holding **Cmd** (macOS) or **Ctrl** (Windows/Linux) while selecting text.
@@ -80,6 +94,12 @@
    - Select the text that is already formatted with `<sup>` or `<sub>` tags.
    - Click the **Normal (n)** button in the popup.
    - The tags will be removed, the text will be reverted to normal formatting, and the popup will disappear.
+
+3. **Remove Formatting with Hidden Tags**:
+   - With **Hide Tags** enabled, tags are invisible — you only see the styled content.
+   - Select the visible superscripted/subscripted text and hold the modifier key (Cmd/Ctrl).
+   - The popup shows **Normal (n)** — click it to remove the tags.
+   - No need to select the exact raw tag boundaries; any overlapping selection works.
 
 ## Contributing
 
