@@ -6,55 +6,6 @@
 
 **SupSub** is an Obsidian plugin that allows you to easily format selected text with `<sup>` and `<sub>` tags, enabling quick superscript and subscript formatting in your notes.
 
-## What's New in Version 1.1.1 (@2026-02-18)
-
-- **Bug Fixes**:
-  - **Fixed Decoration Ordering Crash**: Replaced `RangeSetBuilder` with `Decoration.set(ranges, true)` to eliminate "Ranges must be added sorted" console errors on edge cases.
-  - **Fixed Cursor Placement After Wrapping**: After wrapping text with sup/sub, the cursor now correctly lands inside the tags (before the closing tag) instead of at the end of the line. Uses `requestAnimationFrame` to ensure stable positioning after decoration reflow.
-  - **Fixed Normal Button Not Appearing**: When tags are hidden by decorations, selecting superscripted/subscripted content now reliably shows the "Normal (n)" button. Uses overlap detection instead of strict containment, so imprecise selections still work.
-  - **Fixed Double-Wrapping**: Selecting text that partially overlaps existing tags no longer produces malformed output like `<sup><sup>2</sup></sup>`. The plugin detects overlapping tags and unwraps instead of double-wrapping.
-
-- **Improvements**:
-  - **Position-Aware Unwrapping**: The unwrap logic now scans the raw line for tags at the cursor position rather than relying on exact selection text. This handles all cases where hidden decorations cause visual-to-raw coordinate mismatches.
-  - **Cursor Line Tag Visibility**: Tags are now shown on the line where the cursor is (matching Obsidian's native behavior for bold/italic), allowing direct editing when needed.
-
-## What's New in Version 1.1.0 (@2026-02-17)
-
-- **Bug Fixes**:
-  - **Fixed Tag Hiding Rendering**: Switched from `Decoration.mark()` with `display: none` to `Decoration.replace()` for hiding `<sup>`/`<sub>` tags. This eliminates cursor position mismatches that caused letters to disappear when typing near formatted text.
-  - **Fixed Text Shifting**: Removed `display: inline-block` and `position: relative` CSS properties from superscript/subscript elements that were causing text to shift positions during editing.
-  - **Fixed Hide Tags Toggle**: The "Hide Tags" setting now properly toggles on and off without requiring a restart.
-  - **Performance Optimization**: Decoration computation now only processes visible ranges instead of the entire document.
-
-- **New Features**:
-  - **Modifier Key for Popup**: The popup buttons now require holding a modifier key (Cmd/Ctrl by default) while selecting text. This prevents accidental popup appearances during normal text navigation. Configurable in Settings with options: Cmd/Ctrl, Ctrl, Shift, Alt, or None (legacy behavior).
-  - **Toggle Typing Mode**: Activate superscript or subscript mode without selecting text first. Place your cursor and press the hotkey — a status bar indicator appears and everything you type is automatically formatted. Press Escape to exit. Supports toggling between modes and auto-exits on line change.
-
-## What's New in Version 1.0.5 (@2025-05-19)
-
-- **Bug Fixes**:
-  - **Fixed Text Shifting Issue**: Resolved an issue where superscript and subscript text would shift positions when editing text in rows above.
-  - **Fixed Disappearing Text**: Fixed a problem where letters would disappear when typing near superscript or subscript content.
-  - **Improved Decoration Handling**: Enhanced the way hidden tags are managed to ensure consistent editing experience.
-
-## What's New in Version 1.0.4 (@2024-12-03)
-
-- **Bug Fixes**:
-  - **Resolved Selection Error**: Fixed an issue where enabling the popup buttons and using the **Sup** or **Sub** buttons could cause a `TypeError` related to invalid selection points. The plugin now correctly validates selection ranges to prevent errors.
-  
-- **Improved Stability**:
-  - Enhanced compatibility with the latest Obsidian updates by refining editor integrations and ensuring seamless functionality.
-
-## What's New in Version 1.0.3 (@2024-12-01)
-
-- **Enhanced Button Labels**: Updated the popup buttons to be more user-friendly:
-  - **Sup (ⁿ)**: Wraps the selected text with `<sup>` tags.
-  - **Sub (ₙ)**: Wraps the selected text with `<sub>` tags.
-  - **Normal (n)**: Removes existing `<sup>` or `<sub>` tags from the selected text.
-- **Conditional Button Display**: 
-  - When the selected text is already wrapped in `<sup>` or `<sub>`, only the **Normal (n)** button is displayed to allow easy removal of the tags.
-  - When the selected text is not wrapped, both **Sup (ⁿ)** and **Sub (ₙ)** buttons are available for formatting.
-
 ## Usage
 
 - **Superscript**:
@@ -108,3 +59,56 @@ Contributions are welcome! If you encounter any issues or have suggestions for i
 ## License
 
 This plugin is licensed under the [MIT License](https://github.com/wjgoarxiv/obsidian-supsub/blob/master/LICENSE).
+
+---
+
+## Changelog
+
+### Version 1.1.1 (@2026-02-18)
+
+- **Bug Fixes**:
+  - **Fixed Decoration Ordering Crash**: Replaced `RangeSetBuilder` with `Decoration.set(ranges, true)` to eliminate "Ranges must be added sorted" console errors on edge cases.
+  - **Fixed Cursor Placement After Wrapping**: After wrapping text with sup/sub, the cursor now correctly lands inside the tags (before the closing tag) instead of at the end of the line. Uses `requestAnimationFrame` to ensure stable positioning after decoration reflow.
+  - **Fixed Normal Button Not Appearing**: When tags are hidden by decorations, selecting superscripted/subscripted content now reliably shows the "Normal (n)" button. Uses overlap detection instead of strict containment, so imprecise selections still work.
+  - **Fixed Double-Wrapping**: Selecting text that partially overlaps existing tags no longer produces malformed output like `<sup><sup>2</sup></sup>`. The plugin detects overlapping tags and unwraps instead of double-wrapping.
+
+- **Improvements**:
+  - **Position-Aware Unwrapping**: The unwrap logic now scans the raw line for tags at the cursor position rather than relying on exact selection text. This handles all cases where hidden decorations cause visual-to-raw coordinate mismatches.
+  - **Cursor Line Tag Visibility**: Tags are now shown on the line where the cursor is (matching Obsidian's native behavior for bold/italic), allowing direct editing when needed.
+
+### Version 1.1.0 (@2026-02-17)
+
+- **Bug Fixes**:
+  - **Fixed Tag Hiding Rendering**: Switched from `Decoration.mark()` with `display: none` to `Decoration.replace()` for hiding `<sup>`/`<sub>` tags. This eliminates cursor position mismatches that caused letters to disappear when typing near formatted text.
+  - **Fixed Text Shifting**: Removed `display: inline-block` and `position: relative` CSS properties from superscript/subscript elements that were causing text to shift positions during editing.
+  - **Fixed Hide Tags Toggle**: The "Hide Tags" setting now properly toggles on and off without requiring a restart.
+  - **Performance Optimization**: Decoration computation now only processes visible ranges instead of the entire document.
+
+- **New Features**:
+  - **Modifier Key for Popup**: The popup buttons now require holding a modifier key (Cmd/Ctrl by default) while selecting text. This prevents accidental popup appearances during normal text navigation. Configurable in Settings with options: Cmd/Ctrl, Ctrl, Shift, Alt, or None (legacy behavior).
+  - **Toggle Typing Mode**: Activate superscript or subscript mode without selecting text first. Place your cursor and press the hotkey — a status bar indicator appears and everything you type is automatically formatted. Press Escape to exit. Supports toggling between modes and auto-exits on line change.
+
+### Version 1.0.5 (@2025-05-19)
+
+- **Bug Fixes**:
+  - **Fixed Text Shifting Issue**: Resolved an issue where superscript and subscript text would shift positions when editing text in rows above.
+  - **Fixed Disappearing Text**: Fixed a problem where letters would disappear when typing near superscript or subscript content.
+  - **Improved Decoration Handling**: Enhanced the way hidden tags are managed to ensure consistent editing experience.
+
+### Version 1.0.4 (@2024-12-03)
+
+- **Bug Fixes**:
+  - **Resolved Selection Error**: Fixed an issue where enabling the popup buttons and using the **Sup** or **Sub** buttons could cause a `TypeError` related to invalid selection points. The plugin now correctly validates selection ranges to prevent errors.
+
+- **Improved Stability**:
+  - Enhanced compatibility with the latest Obsidian updates by refining editor integrations and ensuring seamless functionality.
+
+### Version 1.0.3 (@2024-12-01)
+
+- **Enhanced Button Labels**: Updated the popup buttons to be more user-friendly:
+  - **Sup (ⁿ)**: Wraps the selected text with `<sup>` tags.
+  - **Sub (ₙ)**: Wraps the selected text with `<sub>` tags.
+  - **Normal (n)**: Removes existing `<sup>` or `<sub>` tags from the selected text.
+- **Conditional Button Display**:
+  - When the selected text is already wrapped in `<sup>` or `<sub>`, only the **Normal (n)** button is displayed to allow easy removal of the tags.
+  - When the selected text is not wrapped, both **Sup (ⁿ)** and **Sub (ₙ)** buttons are available for formatting.
